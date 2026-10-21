@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mesa de soporte · Prototipo</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>tailwind.config={theme:{extend:{fontFamily:{sans:['Figtree','system-ui','sans-serif']},colors:{ink:'#0F2A2E',brand:'#0E8F80'}}}}</script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{background:#F3F5F6;color:#16282B;font-family:Figtree,system-ui,sans-serif}
+.tbl th{font-weight:600;text-align:left;padding:.6rem .9rem;color:#5B6B6E;font-size:.78rem;border-bottom:1px solid #E3E8E9;white-space:nowrap}
+.tbl td{padding:.7rem .9rem;border-bottom:1px solid #EEF1F2;font-size:.88rem;vertical-align:middle}
+.tbl tbody tr{cursor:pointer}.tbl tbody tr:hover{background:#F6FAFA}
+</style></head>
+<body><div id="root"></div>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script type="text/babel">
+const {useState}=React;
+const TECH=['Marcos Rivera','Lucía Paredes','Andrés Cruz'];
+const PRODS=['eNemeSys','Punto de Venta','Nómina Plus'];
+const STATES=['Abierto','En diagnóstico','En progreso','En espera del cliente','En espera interna','Resuelto','Cerrado'];
+const PRIOS=['Crítica','Alta','Media','Baja'];
+const PC={Crítica:'bg-red-100 text-red-800',Alta:'bg-orange-100 text-orange-800',Media:'bg-amber-100 text-amber-800',Baja:'bg-slate-100 text-slate-700'};
+const SC={Abierto:'bg-blue-100 text-blue-800','En diagnóstico':'bg-violet-100 text-violet-800','En progreso':'bg-teal-100 text-teal-800','En espera del cliente':'bg-amber-100 text-amber-800','En espera interna':'bg-stone-200 text-stone-700',Resuelto:'bg-green-100 text-green-800',Cerrado:'bg-slate-200 text-slate-600'};
+const DONE=['Resuelto','Cerrado'];
+const mk=(n,title,client,prod,pri,st,tech,at,desc,ev=[])=>({id:'TCK-2026-'+String(n).padStart(5,'0'),title,client,prod,pri,st,tech,at,desc,ev:[{k:'msg',who:client,txt:desc,at},...ev]});
+const SEED=[
+mk(128,'El cierre de caja no cuadra con el reporte','Comercial Pacífico','Punto de Venta','Alta','Abierto',null,'20 oct, 10:02','Al cerrar caja hay una diferencia de S/ 340 entre el sistema y el reporte diario.'),
+mk(127,'Nadie puede facturar desde las 9:30','Clínica Santa Lucía','eNemeSys','Crítica','En diagnóstico','Lucía Paredes','20 oct, 09:41','Seis usuarios reciben “tiempo de espera agotado” al emitir comprobantes. Atendemos pacientes y no podemos cobrar.',[{k:'log',txt:'Prioridad: Alta → Crítica (impacto en varios usuarios)',at:'20 oct, 09:44'},{k:'msg',who:'Lucía Paredes',txt:'Recibido. Estoy revisando el servidor de base de datos ahora mismo.',at:'20 oct, 09:47'}]),
+mk(126,'Boletas de nómina con descuentos duplicados','Grupo Ferretero Sur','Nómina Plus','Alta','En progreso','Andrés Cruz','20 oct, 08:30','En las boletas de octubre el descuento de AFP aparece dos veces en 14 empleados.'),
+mk(125,'Error al generar una factura','Distribuidora Andina','eNemeSys','Alta','Resuelto','Marcos Rivera','19 oct, 16:20','Al presionar “Generar factura” aparece un error y el comprobante no se emite.',[
+{k:'log',txt:'Ticket asignado a Marcos Rivera',at:'19 oct, 14:05'},
+{k:'msg',who:'Marcos Rivera',txt:'Hola Camila, ¿puede enviarnos una captura del mensaje de error?',at:'19 oct, 14:12'},
+{k:'msg',who:'Distribuidora Andina',txt:'Adjunto la captura (error_factura.png).',at:'19 oct, 14:20'},
+{k:'note',who:'Marcos Rivera',txt:'Tras la última actualización la serie de comprobantes quedó sin punto de emisión. Mismo patrón que TCK-2026-00118.',at:'19 oct, 14:41'},
+{k:'log',txt:'Sesión de asistencia remota autorizada por el cliente · 18 min',at:'19 oct, 15:30'},
+{k:'log',txt:'Estado: En progreso → Resuelto',at:'19 oct, 16:20'},
+{k:'msg',who:'Marcos Rivera',txt:'Corregimos la configuración y generamos una factura de prueba sin errores. ¿Puede confirmarlo desde su equipo?',at:'19 oct, 16:22'}]),
+mk(124,'Alta de usuario con rol de contador','Distribuidora Andina','eNemeSys','Baja','En espera del cliente','Marcos Rivera','19 oct, 11:10','Necesitamos crear un usuario para la nueva contadora con acceso a reportes.'),
+mk(123,'La impresora de tickets no imprime el logotipo','Comercial Pacífico','Punto de Venta','Media','En espera interna','Andrés Cruz','18 oct, 17:45','Desde el lunes los tickets salen sin el logo de la tienda.'),
+mk(122,'El reporte de inventario tarda demasiado','Textiles Norte','eNemeSys','Media','En diagnóstico','Lucía Paredes','18 oct, 12:00','Generar el reporte de inventario valorizado toma más de 6 minutos.'),
+mk(121,'No llega el correo de recuperación de contraseña','Clínica Santa Lucía','eNemeSys','Media','Resuelto','Lucía Paredes','17 oct, 15:12','Dos usuarios no reciben el correo para restablecer su clave.'),
+mk(120,'Cómo exportar la planilla a Excel','Grupo Ferretero Sur','Nómina Plus','Baja','Cerrado','Marcos Rivera','16 oct, 10:25','¿Hay forma de exportar la planilla mensual a Excel?'),
+mk(119,'Falla la sincronización de ventas con almacén','Textiles Norte','Punto de Venta','Crítica','En progreso','Marcos Rivera','20 oct, 07:55','Las ventas de ayer no descontaron stock y el almacén muestra cantidades erróneas.'),
+mk(118,'Error al facturar con descuento global','Distribuidora Andina','eNemeSys','Alta','Cerrado','Marcos Rivera','12 oct, 13:40','Al aplicar un descuento global la factura no se genera.'),
+mk(117,'Pantalla en blanco al abrir Compras','Textiles Norte','eNemeSys','Media','Abierto',null,'20 oct, 10:15','El módulo de Compras abre en blanco en dos equipos.')
+];
+
+const Badge=({c,children})=><span className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${c}`}>{children}</span>;
+const Card=({className='',children})=><div className={`bg-white rounded-xl border border-slate-200 ${className}`}>{children}</div>;
+const ini=n=>n?n.split(' ').map(x=>x[0]).slice(0,2).join(''):'?';
+const Av=({n})=><span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand/15 text-brand text-xs font-semibold">{ini(n)}</span>;
+const Sel=({v,set,opts,all,cls=''})=><select value={v} onChange={e=>set(e.target.value)} className={`border border-slate-300 rounded-lg px-2.5 py-2 text-sm bg-white ${cls}`}>{all&&<option value="">{all}</option>}{opts.map(o=><option key={o}>{o}</option>)}</select>;
+const H=({children,sub})=><div className="mb-5"><h1 className="text-2xl font-bold tracking-tight">{children}</h1>{sub&&<p className="text-slate-500 text-sm mt-1">{sub}</p>}</div>;
+
+function Dash({tk,open}){
+  const act=tk.filter(t=>!DONE.includes(t.st));
+  const K=[['Tickets abiertos',act.length,'text-ink'],['Críticos',act.filter(t=>t.pri==='Crítica').length,'text-red-700'],['Sin asignar',act.filter(t=>!t.tech).length,'text-amber-700'],['Resueltos esta semana',tk.length-act.length+18,'text-green-700'],['Primera respuesta (prom.)','24 min','text-ink'],['Tiempo de resolución (prom.)','3 h 40 min','text-ink']];
+  const W=[['L',14],['M',19],['X',11],['J',23],['V',17],['S',6],['D',4]];
+  const urg=[...act].sort((a,b)=>PRIOS.indexOf(a.pri)-PRIOS.indexOf(b.pri)).slice(0,5);
+  return <div>
+    <H sub="Martes 20 de octubre de 2026">Buenos días, Marcos</H>
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">{K.map(([l,v,c])=><Card key={l} className="p-4"><div className="text-xs text-slate-500">{l}</div><div className={`text-3xl font-bold mt-1 ${c}`}>{v}</div></Card>)}</div>
+    <div className="grid lg:grid-cols-5 gap-4">
+      <Card className="p-4 lg:col-span-2"><div className="font-semibold mb-4">Tickets recibidos esta semana</div>
+        <div className="flex items-end gap-3 h-40">{W.map(([d,n])=><div key={d} className="flex-1 flex flex-col items-center justify-end h-full"><span className="text-xs text-slate-500 mb-1">{n}</span><div className="w-full rounded-t bg-brand" style={{height:n*4+'px',opacity:d==='J'?1:.55}}></div><span className="text-xs mt-1.5">{d}</span></div>)}</div></Card>
+      <Card className="p-4 lg:col-span-3"><div className="font-semibold mb-2">Requieren atención</div>
+        {urg.map(t=><button key={t.id} onClick={()=>open(t.id)} className="w-full text-left flex items-center gap-3 py-2.5 border-t border-slate-100 first:border-0 hover:bg-slate-50 rounded">
+          <Badge c={PC[t.pri]}>{t.pri}</Badge><div className="min-w-0 flex-1"><div className="text-sm font-medium truncate">{t.title}</div><div className="text-xs text-slate-500">{t.id} · {t.client}</div></div>
+          {t.tech?<Av n={t.tech}/>:<span className="text-xs text-amber-700">Sin asignar</span>}</button>)}</Card>
+    </div></div>;
+}
+
+function List({tk,open}){
+  const [q,setQ]=useState(''),[p,setP]=useState(''),[pr,setPr]=useState(''),[s,setS]=useState(''),[te,setTe]=useState('');
+  const r=tk.filter(t=>(!p||t.prod===p)&&(!pr||t.pri===pr)&&(!s||t.st===s)&&(!te||(te==='Sin asignar'?!t.tech:t.tech===te))&&(!q||(t.title+t.client+t.id).toLowerCase().includes(q.toLowerCase())));
+  return <div>
+    <H sub={`${r.length} de ${tk.length} tickets`}>Tickets</H>
+    <div className="flex flex-wrap gap-2 mb-4">
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar por asunto, cliente o número" className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full sm:w-72 bg-white"/>
+      <Sel v={p} set={setP} opts={PRODS} all="Todos los productos"/><Sel v={pr} set={setPr} opts={PRIOS} all="Toda prioridad"/><Sel v={s} set={setS} opts={STATES} all="Todo estado"/><Sel v={te} set={setTe} opts={[...TECH,'Sin asignar']} all="Todo responsable"/>
+    </div>
+    <Card className="overflow-x-auto"><table className="tbl w-full min-w-[820px]"><thead><tr><th>Ticket</th><th>Asunto</th><th>Producto</th><th>Prioridad</th><th>Estado</th><th>Responsable</th><th>Actualizado</th></tr></thead>
+      <tbody>{r.map(t=><tr key={t.id} onClick={()=>open(t.id)}>
+        <td className="font-medium text-brand whitespace-nowrap">{t.id}</td>
+        <td><div className="font-medium">{t.title}</div><div className="text-xs text-slate-500">{t.client}</div></td>
+        <td>{t.prod}</td><td><Badge c={PC[t.pri]}>{t.pri}</Badge></td><td><Badge c={SC[t.st]}>{t.st}</Badge></td>
+        <td>{t.tech?<span className="flex items-center gap-2 whitespace-nowrap"><Av n={t.tech}/>{t.tech.split(' ')[0]}</span>:<span className="text-amber-700">Sin asignar</span>}</td>
+        <td className="text-slate-500 whitespace-nowrap">{t.at}</td></tr>)}
+      {!r.length&&<tr><td colSpan="7" className="text-center text-slate-500 py-10">Ningún ticket coincide con los filtros. Quita alguno para ver más resultados.</td></tr>}</tbody></table></Card></div>;
+}
+
+function Detail({t,upd,mode,say,back,tk,open}){
+  const cl=mode==='client';
+  const [txt,setTxt]=useState(''),[note,setNote]=useState(false);
+  const me=cl?t.client:'Marcos Rivera';
+  const add=()=>{if(!txt.trim())return;upd(t.id,x=>({...x,at:'Ahora',ev:[...x.ev,{k:note?'note':'msg',who:me,txt,at:'Ahora'}]}));setTxt('');say(note?'Nota interna guardada':'Respuesta enviada');};
+  const chg=(f,val)=>upd(t.id,x=>({...x,[f]:val||null,at:'Ahora',ev:[...x.ev,{k:'log',txt:`${{st:'Estado',pri:'Prioridad',tech:'Responsable'}[f]}: ${x[f]||'Sin asignar'} → ${val||'Sin asignar'}`,at:'Ahora'}]}));
+  const evs=t.ev.filter(e=>!cl||e.k!=='note');
+  const sim=!cl&&t.id==='TCK-2026-00125'?tk.find(x=>x.id==='TCK-2026-00118'):null;
+  return <div>
+    <button onClick={back} className="text-sm text-brand font-medium mb-3">← Volver a {cl?'mis solicitudes':'la lista'}</button>
+    <div className="flex flex-wrap items-center gap-2 mb-1"><span className="text-sm font-medium text-slate-500">{t.id}</span><Badge c={PC[t.pri]}>{t.pri}</Badge><Badge c={SC[t.st]}>{t.st}</Badge></div>
+    <h1 className="text-2xl font-bold tracking-tight mb-5">{t.title}</h1>
+    <div className="grid lg:grid-cols-3 gap-4">
+      <div className="lg:col-span-2 space-y-3">
+        {evs.map((e,i)=>e.k==='log'?<div key={i} className="text-xs text-slate-500 text-center py-1">{e.txt} · {e.at}</div>:
+          <div key={i} className={`flex gap-3 ${e.k==='note'?'':''}`}><Av n={e.who}/>
+            <div className={`rounded-xl px-4 py-3 text-sm flex-1 border ${e.k==='note'?'bg-amber-50 border-amber-200':'bg-white border-slate-200'}`}>
+              <div className="flex justify-between gap-2 mb-1"><span className="font-semibold">{e.who}{e.k==='note'&&<span className="ml-2 text-xs font-medium text-amber-800">Nota interna · el cliente no la ve</span>}</span><span className="text-xs text-slate-400 shrink-0">{e.at}</span></div>{e.txt}</div></div>)}
+        <Card className="p-3">
+          {!cl&&<div className="flex gap-1 mb-2">{[['Responder al cliente',false],['Nota interna',true]].map(([l,b])=><button key={l} onClick={()=>setNote(b)} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${note===b?(b?'bg-amber-100 text-amber-900':'bg-brand text-white'):'text-slate-600 hover:bg-slate-100'}`}>{l}</button>)}</div>}
+          <textarea value={txt} onChange={e=>setTxt(e.target.value)} rows="3" placeholder={note?'Escribe un diagnóstico o aviso para el equipo…':'Escribe tu mensaje…'} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"/>
+          <div className="flex justify-between items-center mt-2"><span className="text-xs text-slate-500">{cl?'Puedes adjuntar capturas en el siguiente paso.':'Adjuntar archivo disponible en la versión completa.'}</span>
+            <button onClick={add} className="bg-brand text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-teal-700">{note?'Guardar nota':'Enviar respuesta'}</button></div></Card>
+      </div>
+      <div className="space-y-3">
+        <Card className="p-4 space-y-3 text-sm">
+          {cl?<><div><div className="text-xs text-slate-500">Producto</div>{t.prod}</div><div><div className="text-xs text-slate-500">Atiende</div>{t.tech||'Pendiente de asignación'}</div><div><div className="text-xs text-slate-500">Última actualización</div>{t.at}</div></>:
+          <><label className="block"><div className="text-xs text-slate-500 mb-1">Estado</div><Sel v={t.st} set={v=>chg('st',v)} opts={STATES} cls="w-full"/></label>
+          <label className="block"><div className="text-xs text-slate-500 mb-1">Prioridad</div><Sel v={t.pri} set={v=>chg('pri',v)} opts={PRIOS} cls="w-full"/></label>
+          <label className="block"><div className="text-xs text-slate-500 mb-1">Responsable</div><Sel v={t.tech||''} set={v=>chg('tech',v)} opts={TECH} all="Sin asignar" cls="w-full"/></label>
+          <div><div className="text-xs text-slate-500">Cliente</div>{t.client}</div><div><div className="text-xs text-slate-500">Producto</div>{t.prod}</div></>}
+        </Card>
+        {!cl&&<><button onClick={()=>say('Solicitud enviada al cliente. La sesión remota inicia cuando la autorice.')} className="w-full bg-ink text-white text-sm font-semibold py-2.5 rounded-lg">Solicitar asistencia remota</button>
+        <p className="text-xs text-slate-500 px-1">Usa la herramienta aprobada por la empresa. No se guardan contraseñas.</p>
+        {sim&&<Card className="p-4 border-amber-300 bg-amber-50"><div className="text-sm font-semibold mb-1">Problema recurrente</div><p className="text-xs text-slate-600 mb-2">Este error ya ocurrió con el mismo cliente. Revisa su solución antes de diagnosticar de nuevo.</p><button onClick={()=>open(sim.id)} className="text-sm text-brand font-medium">{sim.id} · {sim.title}</button></Card>}</>}
+      </div></div></div>;
+}
+
+function Portal({tk,setTk,open,say}){
+  const C='Distribuidora Andina';const mine=tk.filter(t=>t.client===C);
+  const [f,setF]=useState({prod:'eNemeSys',title:'',desc:''});const [show,setShow]=useState(false);
+  const send=()=>{if(!f.title.trim()||!f.desc.trim()){say('Completa el asunto y la descripción');return;}
+    const n=Math.max(...tk.map(t=>+t.id.slice(-5)))+1;setTk(a=>[mk(n,f.title,C,f.prod,'Media','Abierto',null,'Ahora',f.desc),...a]);setF({prod:'eNemeSys',title:'',desc:''});setShow(false);say('Solicitud enviada. Te avisaremos por correo cuando haya novedades.');};
+  return <div>
+    <div className="rounded-2xl bg-ink text-white p-6 mb-5"><div className="text-sm text-teal-200">Portal de clientes · {C}</div><h1 className="text-2xl font-bold mt-1">Hola, Camila. ¿En qué podemos ayudarte?</h1>
+      <button onClick={()=>setShow(!show)} className="mt-4 bg-white text-ink text-sm font-semibold px-4 py-2 rounded-lg">{show?'Cancelar':'Reportar un problema'}</button></div>
+    {show&&<Card className="p-5 mb-5 space-y-3"><div className="font-semibold">Nueva solicitud</div>
+      <Sel v={f.prod} set={v=>setF({...f,prod:v})} opts={PRODS}/>
+      <input value={f.title} onChange={e=>setF({...f,title:e.target.value})} placeholder="Asunto (ej. Error al generar una factura)" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"/>
+      <textarea value={f.desc} onChange={e=>setF({...f,desc:e.target.value})} rows="4" placeholder="Cuéntanos qué pasó y cuántas personas afecta" className="w-full border border-slate-300 rounded-lg p-3 text-sm"/>
+      <div className="border border-dashed border-slate-300 rounded-lg p-4 text-center text-sm text-slate-500">Arrastra capturas de pantalla aquí o toca para adjuntar</div>
+      <button onClick={send} className="bg-brand text-white text-sm font-semibold px-4 py-2 rounded-lg">Enviar solicitud</button></Card>}
+    <div className="font-semibold mb-2">Mis solicitudes ({mine.length})</div>
+    <div className="space-y-2">{mine.map(t=><button key={t.id} onClick={()=>open(t.id)} className="w-full text-left bg-white border border-slate-200 rounded-xl p-4 hover:border-brand">
+      <div className="flex justify-between gap-2 items-start"><div><div className="font-medium">{t.title}</div><div className="text-xs text-slate-500 mt-0.5">{t.id} · {t.prod} · {t.at}</div></div><Badge c={SC[t.st]}>{t.st}</Badge></div></button>)}</div></div>;
+}
+
+function Admin({tk}){
+  const by=(arr,fn)=>arr.map(a=>[a,tk.filter(t=>fn(t,a)).length]);
+  const P=by(PRODS,(t,a)=>t.prod===a),T=by(TECH,(t,a)=>t.tech===a&&!DONE.includes(t.st));
+  const Bar=({rows,color})=>{const m=Math.max(...rows.map(r=>r[1]),1);return rows.map(([l,n])=><div key={l} className="mb-3"><div className="flex justify-between text-sm mb-1"><span>{l}</span><span className="font-semibold">{n}</span></div><div className="h-2.5 rounded bg-slate-100"><div className={`h-2.5 rounded ${color}`} style={{width:n/m*100+'%'}}></div></div></div>)};
+  const R=[['Crítica','12 min','1 h 50 min'],['Alta','25 min','3 h 10 min'],['Media','48 min','7 h 30 min'],['Baja','2 h 05 min','1 día']];
+  return <div><H sub="Datos de ejemplo de los últimos 30 días">Administración</H>
+    <div className="grid md:grid-cols-2 gap-4">
+      <Card className="p-5"><div className="font-semibold mb-4">Tickets por producto</div><Bar rows={P} color="bg-brand"/></Card>
+      <Card className="p-5"><div className="font-semibold mb-4">Carga activa por técnico</div><Bar rows={T} color="bg-ink"/></Card>
+      <Card className="p-5 overflow-x-auto"><div className="font-semibold mb-3">Tiempos por prioridad</div><table className="tbl w-full"><thead><tr><th>Prioridad</th><th>1ª respuesta</th><th>Resolución</th></tr></thead><tbody>{R.map(([p,a,b])=><tr key={p} style={{cursor:'default'}}><td><Badge c={PC[p]}>{p}</Badge></td><td>{a}</td><td>{b}</td></tr>)}</tbody></table></Card>
+      <Card className="p-5"><div className="font-semibold mb-3">Problemas recurrentes</div>
+        {[['Configuración de series tras actualizar eNemeSys',6],['Tiempo de espera en facturación',4],['Sincronización de stock con almacén',3]].map(([l,n])=><div key={l} className="flex justify-between gap-3 py-2.5 border-t border-slate-100 first:border-0 text-sm"><span>{l}</span><Badge c="bg-slate-100 text-slate-700">{n} casos</Badge></div>)}
+        <div className="mt-3 text-xs text-slate-500">Reabiertos: 4 % · Satisfacción: pendiente de medir en el piloto</div></Card>
+    </div></div>;
+}
+
+function App(){
+  const [tk,setTk]=useState(SEED),[v,setV]=useState('dash'),[sel,setSel]=useState(null),[toast,setToast]=useState('');
+  const say=m=>{setToast(m);setTimeout(()=>setToast(''),2800)};
+  const upd=(id,f)=>setTk(a=>a.map(t=>t.id===id?f(t):t));
+  const go=x=>{setV(x);setSel(null);window.scrollTo(0,0)};
+  const open=id=>{setSel(id);window.scrollTo(0,0)};
+  const N=[['dash','Panel'],['list','Tickets'],['admin','Administración'],['portal','Portal del cliente']];
+  const cur=tk.find(t=>t.id===sel);const portal=v==='portal';
+  return <div className="md:flex min-h-screen">
+    <aside className="bg-ink text-white md:w-60 md:shrink-0 md:sticky md:top-0 md:h-screen p-3 md:p-5 flex md:block items-center gap-2 overflow-x-auto">
+      <div className="hidden md:block mb-6"><div className="text-lg font-bold">Mesa de soporte</div><div className="text-xs text-teal-200 mt-0.5">Equipo técnico</div></div>
+      <nav className="flex md:block gap-1">{N.map(([k,l])=><button key={k} onClick={()=>go(k)} className={`block whitespace-nowrap text-left w-full px-3 py-2 rounded-lg text-sm font-medium md:mb-1 ${v===k?'bg-white/15':'text-teal-50/80 hover:bg-white/10'}`}>{l}</button>)}</nav>
+      <div className="hidden md:flex absolute bottom-5 items-center gap-2 text-sm"><Av n="Marcos Rivera"/><div>Marcos Rivera<div className="text-xs text-teal-200">Técnico</div></div></div>
+    </aside>
+    <main className="flex-1 p-4 md:p-8 max-w-6xl w-full">
+      {cur?<Detail key={cur.id} t={cur} upd={upd} mode={portal?'client':'staff'} say={say} back={()=>setSel(null)} tk={tk} open={open}/>:
+       v==='dash'?<Dash tk={tk} open={open}/>:v==='list'?<List tk={tk} open={open}/>:v==='admin'?<Admin tk={tk}/>:<Portal tk={tk} setTk={setTk} open={open} say={say}/>}
+    </main>
+    {toast&&<div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-ink text-white text-sm px-4 py-2.5 rounded-lg shadow-lg max-w-[90%] text-center" style={{marginBottom:'env(safe-area-inset-bottom,0px)'}}>{toast}</div>}
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>
